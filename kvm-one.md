@@ -1,3 +1,4 @@
+```bash
 # =============================================================
 # kvm-one — Ubuntu 24.04 KVM Hypervisor
 # ASN 65010 | Lo: 10.10.254.10/32 | VTEP: 10.10.254.10
@@ -161,3 +162,4 @@ line vty
 # FILE: /etc/sysctl.d/99-network-tune.conf
 # ─────────────────────────────────────────────
 # (See dedicated sysctl section)
+```
