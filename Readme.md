@@ -43,4 +43,56 @@ Everything is generated. Here's a summary of the full design and key implementat
 5. **nftables on fw-host**: Stateful firewall — allows established/related, BFD (UDP 3784/3785), BGP (TCP 179), VXLAN (UDP 4789), and NAT masquerade for tenant-to-WAN traffic
 6. **sysctl**: Apply `sysctl --system` on all devices; `nf_conntrack` lines can be omitted on switches and KVM hosts if you don't use NAT there
 
+All 12 configuration blocks are generated and saved. Here's a summary of everything produced:
 
+---
+
+## Architecture Summary
+
+### Design Principles
+- **Pure L3 fabric** — no MLAG, no LACP, no STP on uplinks
+- **BGP unnumbered** on all host↔switch links using IPv6 link-local (no point-to-point IPs to manage)
+- **Active/backup redundancy** via BGP `local-preference`: active links get LP 200, backup links get LP 100 — set as inbound route-maps on each host/firewall
+- **BFD profile `fast-link`**: 100ms Tx/Rx, 3× multiplier → **300ms detection** on any link/node failure
+- **BGP EVPN** with switch-one acting as **Route Reflector** for all EVPN peers; switch-two is RR client
+- **Anycast gateway**: both switches share IP `10.10.200.1/22` and MAC `44:38:39:ff:00:01` on `vlan200`/`vxlan200`
+
+---
+
+### Config Index
+
+| Config Card | File | Device(s) |
+|---|---|---|
+| `switch-one` | `/etc/network/interfaces` | switch-one |
+| `switch-two` | `/etc/network/interfaces` | switch-two |
+| `kvm-one` | `/etc/netplan/01-netcfg.yaml` + systemd-networkd | kvm-one |
+| `kvm-two` | `/etc/netplan/01-netcfg.yaml` + systemd-networkd | kvm-two |
+| `firewall` | `/etc/netplan/01-netcfg.yaml` | firewall |
+| `switch-one-frr` | `/etc/frr/frr.conf` | switch-one |
+| `switch-two-frr` | `/etc/frr/frr.conf` | switch-two |
+| `kvm-one-frr` | `/etc/frr/frr.conf` | kvm-one |
+| `kvm-two-frr` | `/etc/frr/frr.conf` | kvm-two |
+| `firewall-frr` | `/etc/frr/frr.conf` | firewall |
+| `switches-sysctl` | `/etc/sysctl.d/99-fabric.conf` | both switches |
+| `hosts-sysctl` | `/etc/sysctl.d/99-fabric.conf` + `99-firewall.conf` | KVM hosts + firewall |
+
+---
+
+### Key Notes & Action Items
+
+1. **WAN interface name** — update `enp1s0` in `firewall`'s netplan to your actual WAN NIC (`ip link show` to find it)
+
+2. **DHCP → FRR default route** — create `/etc/dhcp/dhclient-exit-hooks.d/frr-default`:
+   ```bash
+   if [ "$reason" = BOUND ] || [ "$reason" = RENEW ]; then
+     vtysh -c "conf t" -c "ip route 0.0.0.0/0 $router" -c "end" -c "write"
+   fi
+   ```
+
+3. **FRR daemons** — ensure `/etc/frr/daemons` has `bgpd=yes` and `bfdd=yes` on all devices
+
+4. **systemd-networkd VXLAN** — the `.netdev`/`.network` files shown as comments in the kvm netplan cards should be created as **actual files** in `/etc/systemd/network/`
+
+5. **nftables** — a production nftables skeleton is included as comments in `firewall-frr`; save it to `/etc/nftables.conf` and enable with `systemctl enable --now nftables`
+
+6. **Apply order**: sysctl → interfaces/netplan → FRR → verify with `vtysh -c 'show bgp summary'` and `vtysh -c 'show bfd peers'`
