@@ -1,3 +1,13 @@
+### The Problem/Requirement
+---
+I want to connect two KVM hosts running Ubuntu 24.04, where each host has two Ethernet interfaces connected to two separate Mellanox leaf switches for redundancy. On kvm-one, one interface (enp94s0f0np0 ) connects to switch-one (port swp1) and the other (enp94s0f1np1) connects to switch-two (port swp1). On kvm-two, one interface connects to switch-one (port swp2) and the other connects to switch-two (port swp2). The two hosts will communicate with each other over VXLAN using VNI 200 through these leaf switches. The design ensures full redundancy, meaning if one switch or link fails, the other will take over, and each host uses one active link and one backup link. This setup avoids any Layer 2 technologies like MLAG or LACP and instead uses a pure Layer 3 design with BGP and BGP EVPN for both underlay and overlay networks, along with IPv6 and jumbo frames (MTU 9216) for better performance. Both switches will have an anycast gateway with IP 10.10.200.1/22, while the KVM hosts will use IP addresses 10.10.200.10/22 and 10.10.200.11/22. Loopback interfaces will be used for VTEP endpoints, with IPs 10.10.254.5/32 and 10.10.254.6/32 on the switches, and 10.10.254.10/32 and 10.10.254.11/32 on the hosts. The switches will use BGP ASN 65000, and the KVM hosts will use ASN 65010 and 65011.
+
+Now I will add another device, a firewall host running Ubuntu 24.04 with two Ethernet interfaces, enp94s0f0np0 and enp94s0f1np1. These two interfaces will be connected to switch-one and switch-two on port swp48 for redundancy, where one link will be active and the other will act as a backup. The firewall will use BGP ASN 65001 and have a loopback IP address of 10.10.254.1/32. It will also use the anycast gateway address 10.10.200.1/22 as its bridge IP. The WAN interface will obtain its IP address dynamically using DHCPv4 from the uplink devices. This firewall will act as the default gateway for the entire network and will function mainly as a packet-filtering firewall.
+
+Generate the architectural diagram and generate he configurations that will include `/etc/network/interfaces` for the Mellanox switches, `/etc/netplan/01-netcfg.yaml` for the Ubuntu hosts, and `frr.conf` for all devices, with BFD enabled for fast failure detection and quick convergence, along with kernel tuning using `sysctl.conf` at the end.
+
+---
+
 Everything is generated. Here's a summary of the full design and key implementation notes:
 
 ---
@@ -32,3 +42,5 @@ Everything is generated. Here's a summary of the full design and key implementat
 4. **WAN interface on fw-host**: Named `wan0` as placeholder — replace with your actual interface name (`ip link show` to find it)
 5. **nftables on fw-host**: Stateful firewall — allows established/related, BFD (UDP 3784/3785), BGP (TCP 179), VXLAN (UDP 4789), and NAT masquerade for tenant-to-WAN traffic
 6. **sysctl**: Apply `sysctl --system` on all devices; `nf_conntrack` lines can be omitted on switches and KVM hosts if you don't use NAT there
+
+
