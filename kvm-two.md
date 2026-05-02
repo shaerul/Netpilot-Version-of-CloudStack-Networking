@@ -213,6 +213,7 @@ net.core.somaxconn = 65535
 
 # ---- Disable bridge netfilter (no double NAT for VMs) ----
 net.bridge.bridge-nf-call-iptables = 0
-```
+
 net.bridge.bridge-nf-call-ip6tables = 0
 net.bridge.bridge-nf-call-arptables = 0
+```
