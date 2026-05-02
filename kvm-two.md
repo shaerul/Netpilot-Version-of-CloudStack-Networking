@@ -1,3 +1,4 @@
+```
 ##############################################
 # /etc/netplan/01-netcfg.yaml
 # kvm-one — ASN 65010 | VTEP 10.10.254.10/32
@@ -212,5 +213,6 @@ net.core.somaxconn = 65535
 
 # ---- Disable bridge netfilter (no double NAT for VMs) ----
 net.bridge.bridge-nf-call-iptables = 0
+```
 net.bridge.bridge-nf-call-ip6tables = 0
 net.bridge.bridge-nf-call-arptables = 0
